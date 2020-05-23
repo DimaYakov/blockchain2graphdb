@@ -13,8 +13,8 @@ public class BlockChainParser {
     // Check the documentation of Bitcoin Core if you are using
     // it, or use any other directory with blk*dat files.
     static String PREFIX = "/home/chuits/snap/bitcoin-core/common/.bitcoin/blocks/";
-    final int delay = 2050;
-    final int halfDelay = delay / 2;
+    int delay = 1125;
+    final int halfDelay = 100;
 
     Comparator blockComparator = new Comparator<Block>()
     {
@@ -40,19 +40,20 @@ public class BlockChainParser {
         // The list of files is built with the method buildList(), see
         // below for its definition.
         BlockFileLoader loader = new BlockFileLoader(np,new File(PREFIX));
+        //BlockFileLoader loader = new BlockFileLoader(np,buildList());
 
         // A simple counter to have an idea of the progress
         int blockCounter = 0;
         int sortedBlockCounter = 0;
         int parsedBlockCounter = 0;
-        List<Block> blockList = new LinkedList<Block>();
+        List<Block> blockList = new ArrayList<Block>();
 
         // bitcoinj does all the magic: from the list of files in the loader
         // it builds a list of blocks. We iterate over it using the following
         // for loop
         Date prev = null;
         for (Block blk : loader) {
-            if (blockCounter > 2051) break;
+
             blockList.add(blk);
             sortedBlockCounter++;
             System.out.println("Block "+ (blockCounter + sortedBlockCounter) + " added to be sorted");
@@ -64,8 +65,8 @@ public class BlockChainParser {
 
                     if (parsedBlockCounter == halfDelay)  {
                         parsedBlockCounter = 0;
-                        sortedBlockCounter = halfDelay;
-                        LinkedList<Block> newBlockList = new LinkedList<Block>(blockList.subList(halfDelay, delay));
+                        sortedBlockCounter = delay - halfDelay;
+                        ArrayList<Block> newBlockList = new ArrayList<Block>(blockList.subList(halfDelay, delay));
                         blockList.clear();
                         blockList = newBlockList;
                         break;
@@ -73,10 +74,9 @@ public class BlockChainParser {
 
                     System.out.println("Analysing block "+blockCounter);
                     blockCounter++;
-                    if (blockCounter > 2051) break;
                     parsedBlockCounter++;
 
-                    Date cur = block.getTime();
+                    /*Date cur = block.getTime();
                     if (prev == null) {
                         prev = cur;
                     } else {
@@ -88,16 +88,22 @@ public class BlockChainParser {
                         } else {
                             prev = cur;
                         }
-                    }
-                    parseBlock(block);
+                    }*/
+                    parseBlock(block, np);
                 }
             }
 
         } // End of iteration over blocks
 
+        for (Block block : blockList) {
+            System.out.println("Analysing block "+blockCounter);
+            blockCounter++;
+            parseBlock(block, np);
+        }
+
     }  // end of doSomething() method.
 
-    void parseBlock(Block block) {
+    void parseBlock(Block block, NetworkParameters np) {
         // The following is highly inefficient: we could simply do
         // block.getTransactions().size(), but is shows you
         // how to iterate over transactions in a block
@@ -128,7 +134,7 @@ public class BlockChainParser {
                     int id = to.getIndex();
                     String ad;
                     try {
-                        ad = to.getScriptPubKey().getToAddress(MainNetParams.get(), true).toString();
+                        ad = to.getScriptPubKey().getToAddress(np, true).toString();
                     } catch (final ScriptException x) {
                         ad = "Невозможно декодировать выходной адрес";
                     } catch (final IllegalArgumentException x) {
@@ -149,7 +155,8 @@ public class BlockChainParser {
     // pattern (block files have name blkNNNNN.dat)
     private List<File> buildList() {
         List<File> list = new LinkedList<File>();
-        for (int i = 0; true; i++) {
+        for (int i = 2000; true; i++) {
+            System.out.println(i);
             File file = new File(PREFIX + String.format(Locale.US, "blk%05d.dat", i));
             if (!file.exists())
                 break;
