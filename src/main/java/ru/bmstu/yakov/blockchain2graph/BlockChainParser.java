@@ -23,7 +23,7 @@ public class BlockChainParser {
     private int walletIDCounter;
     static String PREFIX = "/home/chuits/snap/bitcoin-core/common/.bitcoin/blocks/";
     private static final Logger LOGGER = LoggerFactory.getLogger(BlockChainParser.class);
-    int delay = 1125;
+    int delay = 1126;
     final int halfDelay = 100;
 
     public BlockChainParser(GraphTraversalSource g, NetworkParameters np) {
@@ -228,7 +228,7 @@ public class BlockChainParser {
     }
 
     // A simple method with everything in it
-    public void parseBlockChain() {
+    public void parseBlockChain() throws Exception{
 
         // We create a BlockFileLoader object by passing a list of files.
         // The list of files is built with the method buildList(), see
@@ -247,28 +247,38 @@ public class BlockChainParser {
         // for loop
         //Date prev = null;
 
+        String previousHash = "";
+        String prevHash = "";
+        boolean firstLoop = true;
+
         for (Block blk : loader) {
-            if (blockCounter == 2500) break;
+
             blockList.add(blk);
             sortedBlockCounter++;
             System.out.println("Block "+ (blockCounter + sortedBlockCounter) + " added to be sorted");
             if (sortedBlockCounter == delay) {
                 System.out.println("Sorting blocks from " + blockCounter + " to " + (blockCounter + delay));
-                Collections.sort(blockList, blockComparator);
 
-                String prevHash = blockList.get(0).getHashAsString();
-
-                for (int i = 1; i < blockList.size() - 1; i++) {
-                    Block b = blockList.get(i);
-                    String curHash = b.getPrevBlockHash().toString();
-                    if (!curHash.equals(prevHash)) {
-                        blockList.remove(i);
-                        blockList.add(i+1, b);
-                        prevHash = blockList.get(i).getHashAsString();
+                for (int i = 0; i <= halfDelay; i++) {
+                    if (firstLoop) {
+                        previousHash = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f";
+                        prevHash = previousHash;
+                        firstLoop = false;
                     } else {
-                        prevHash = b.getHashAsString();
+                        for (int j = 0; j < blockList.size(); j++) {
+                            Block b = blockList.get(i);
+                            String curHash = b.getPrevBlockHash().toString();
+                            if (!curHash.equals(prevHash)) {
+                                blockList.remove(i);
+                                blockList.add(b);
+                            } else {
+                                prevHash = b.getHashAsString();
+                                break;
+                            }
+                        }
                     }
                 }
+                prevHash = blockList.get(halfDelay-1).getHashAsString();
 
                 System.out.println("Blocks are sorted");
                 for (Block block : blockList) {
@@ -282,7 +292,21 @@ public class BlockChainParser {
                         break;
                     }
 
-                    if (blockCounter == 2500) break;
+                    if (blockCounter > 0) {
+                        String currentHash = block.getPrevBlockHash().toString();
+                        if (!currentHash.equals(previousHash)) {
+                            System.out.println("prev = " + previousHash + " cur = " + currentHash + " " + blockCounter);
+                            int i = 0;
+                            for (Block bk : blockList) {
+                                System.out.println(blockCounter - parsedBlockCounter + i + " " + bk.getHashAsString());
+                                i++;
+                            }
+                            throw new Exception("gg");
+                        } else {
+                            previousHash = block.getHashAsString();
+                        }
+                    }
+
                     System.out.println("Analysing block "+blockCounter);
 
                     /*Date cur = block.getTime();
@@ -307,12 +331,10 @@ public class BlockChainParser {
 
         } // End of iteration over blocks
 
-        /*System.out.println("Sorting blocks from " + blockCounter + " to " + (blockCounter + delay));
+        System.out.println("Sorting blocks from " + blockCounter + " to " + (blockCounter + delay));
         Collections.sort(blockList, blockComparator);
 
-        String prevHash = blockList.get(0).getHashAsString();
-
-        for (int i = 1; i < blockList.size() - 1; i++) {
+        for (int i = 0; i < blockList.size() - 1; i++) {
             Block b = blockList.get(i);
             String curHash = b.getPrevBlockHash().toString();
             if (!curHash.equals(prevHash)) {
@@ -328,12 +350,21 @@ public class BlockChainParser {
 
         for (Block block : blockList) {
 
+            if (blockCounter > 0) {
+                String currentHash = block.getPrevBlockHash().toString();
+                if (!currentHash.equals(previousHash)) {
+                    System.out.println("prev = " + previousHash + " cur = " + currentHash);
+                    throw new Exception("gg");
+                } else {
+                    previousHash = block.getHashAsString();
+                }
+            }
             System.out.println("Analysing block "+blockCounter);
             parseBlock(block, blockCounter);
 
             blockCounter++;
             parsedBlockCounter++;
-        }*/
+        }
 
     }  // end of doSomething() method.
 
@@ -359,6 +390,132 @@ public class BlockChainParser {
 
             g.V().has("name", blockHash)
                     .property("BlockBalance", blockBalance).property("BlockFee", blockFee).iterate();
+
+            g.tx().commit();
+
+        } catch (Exception e) {
+            LOGGER.error(e.getMessage(), e);
+
+            g.tx().rollback();
+        }
+    }
+
+    void deleteOutput(String transactionHash, Vertex output, int blockCounter) {
+        try {
+            String o = output.value("name");
+
+            final Vertex address = g.V().has("name", o).out("locked").next();
+            String addressAddress = address.value("name");
+
+            Date addressFirstAppearDate = address.value("AddressFirstAppearDate");
+            Date addressLastAppearDate = address.value("AddressLastAppearDate");
+
+            if (!addressFirstAppearDate.before(addressLastAppearDate)) {
+                LOGGER.info("Deleting address " + addressAddress);
+
+                g.V().has("name", addressAddress).drop().iterate();
+
+                g.tx().commit();
+
+            } else {
+                LOGGER.info("Updating address " + addressAddress);
+                long outputBalance = output.value("OutputBalance");
+                long addressBalance = address.value("AddressBalance");
+                addressBalance -= outputBalance;
+
+                List<Vertex> transactions = g.V().has("name", addressAddress).in("locked").in("output").toList();
+
+                addressLastAppearDate = addressFirstAppearDate;
+                for (Vertex tx : transactions) {
+                    Date date = tx.value("TransactionDate");
+                    if (date.after(addressLastAppearDate)) {
+                        addressLastAppearDate = date;
+                    }
+                }
+
+                long addressInputTransactionBalance = address.value("AddressInputTransactionBalance");
+                addressInputTransactionBalance -= outputBalance;
+                long addressOutputTransactionBalance = address.value("AddressOutputTransactionBalance");
+                int addressTransactionCount = address.value("AddressTransactionCount");
+                addressTransactionCount--;
+                int addressInputTransactionCount = address.value("AddressInputTransactionCount");
+                addressInputTransactionCount--;
+                int addressOutputTransactionCount = address.value("AddressOutputTransactionCount");
+                int addressInputAddressCount = address.value("AddressInputAddressCount");
+                int addressOutputAddressCount = address.value("AddressOutputAddressCount");
+                int addressBetweenWalletTransactionCount = address.value("AddressBetweenAddressTransactionCount");
+                int addressWalletID = address.value("AddressWalletID");
+
+                boolean inputAddress = g.V().has("name", transactionHash)
+                        .in("input").out("locked").has("name", addressAddress).hasNext();
+
+                if (inputAddress) {
+                    addressBetweenWalletTransactionCount--;
+                }
+
+                g.V().has("name", addressAddress)
+                        .property("AddressBalance", addressBalance)
+                        .property("AddressFirstAppearDate", addressFirstAppearDate)
+                        .property("AddressLastAppearDate", addressLastAppearDate)
+                        .property("AddressInputTransactionBalance", addressInputTransactionBalance)
+                        .property("AddressOutputTransactionBalance", addressOutputTransactionBalance)
+                        .property("AddressTransactionCount", addressTransactionCount)
+                        .property("AddressInputTransactionCount", addressInputTransactionCount)
+                        .property("AddressOutputTransactionCount", addressOutputTransactionCount)
+                        .property("AddressInputAddressCount", addressInputAddressCount)
+                        .property("AddressOutputAddressCount", addressOutputAddressCount)
+                        .property("AddressBetweenAddressTransactionCount", addressBetweenWalletTransactionCount)
+                        .property("AddressWalletID", addressWalletID).iterate();
+            }
+
+            g.V().has("name", o).drop().iterate();
+
+            g.tx().commit();
+
+            calculateAndUpdateAddress(addressAddress);
+
+        } catch (Exception e) {
+            LOGGER.error(e.getMessage(), e);
+
+            g.tx().rollback();
+        }
+    }
+
+    void deleteTransaction(Vertex transaction, int blockCounter) {
+        try {
+
+            String tx = transaction.value("name");
+            LOGGER.info("Deleting transaction " + tx + " from block " + blockCounter);
+
+            final List<Vertex> outputs = g.V().has("name", tx).out("output").toList();
+
+            g.tx().commit();
+
+            for (Vertex o : outputs) {
+                deleteOutput(tx, o, blockCounter);
+            }
+
+            g.V().has("name", tx).drop().iterate();
+
+            g.tx().commit();
+
+        } catch (Exception e) {
+            LOGGER.error(e.getMessage(), e);
+
+            g.tx().rollback();
+        }
+    }
+
+    void deleteBlock(String blockHash, int blockCounter) {
+        try {
+            LOGGER.info("Deleting block " + blockCounter);
+
+            final List<Vertex> transactions = g.V().has("name", blockHash).out("has").toList();
+
+            for (Vertex tx : transactions) {
+                deleteTransaction(tx, blockCounter);
+            }
+            g.V().has("name", blockHash).drop().iterate();
 
             g.tx().commit();
 
@@ -437,24 +594,13 @@ public class BlockChainParser {
             addressInputTransactionCount = address.value("AddressInputTransactionCount");
             addressInputTransactionCount++;
             addressOutputTransactionCount = address.value("AddressOutputTransactionCount");
-            //????????????????
             addressInputAddressCount = address.value("AddressInputAddressCount");
             addressOutputAddressCount = address.value("AddressOutputAddressCount");
             addressBetweenWalletTransactionCount = address.value("AddressBetweenAddressTransactionCount");
             addressWalletID = address.value("AddressWalletID");
 
-            //final List<Vertex> ins = g.V().has("name", transactionHash).in("input").toList();
-
             boolean inputAddress = g.V().has("name", transactionHash)
                     .in("input").out("locked").has("name", addressAddress).hasNext();
-
-            /*for (Vertex in : ins) {
-                String name = in.value("name");
-                if (g.V().has("name", name).out("locked").has("name", addressAddress).hasNext()) {
-                    inputAddress = true;
-                    break;
-                }
-            }*/
 
             if (inputAddress) {
                 addressBetweenWalletTransactionCount++;
@@ -473,7 +619,6 @@ public class BlockChainParser {
             addressTransactionCount = 1;
             addressInputTransactionCount = 1;
             addressOutputTransactionCount = 0;
-            //????????????????
             addressInputAddressCount = 0;
             addressOutputAddressCount = 0;
             addressBetweenWalletTransactionCount = 0;
@@ -505,7 +650,6 @@ public class BlockChainParser {
         int addressInputTransactionCount = address.value("AddressInputTransactionCount");
         int addressOutputTransactionCount = address.value("AddressOutputTransactionCount");
         addressOutputTransactionCount++;
-        //?????????????????????????
         int addressInputAddressCount = address.value("AddressInputAddressCount");
         int addressOutputAddressCount = address.value("AddressOutputAddressCount");
         int addressBetweenWalletTransactionCount = address.value("AddressBetweenAddressTransactionCount");
@@ -701,9 +845,10 @@ public class BlockChainParser {
         BlockChainParser bp = new BlockChainParser(g, np);
         bp.parseBlockChain();
 
-        JanusGraph graph = tg.getJanusGraph();
-        graph.io(IoCore.graphml()).writeGraph("output/export.xml");
+        /*JanusGraph graph = tg.getJanusGraph();
+        graph.io(IoCore.graphml()).writeGraph("output/export.xml");*/
 
-        tg.dropGraph();
+        tg.closeGraph();
+        //tg.dropGraph();
     }
 }
