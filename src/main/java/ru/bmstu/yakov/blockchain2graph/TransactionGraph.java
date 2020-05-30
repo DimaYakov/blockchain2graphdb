@@ -28,9 +28,6 @@ import org.slf4j.LoggerFactory;
 public class TransactionGraph {
     private static final Logger LOGGER = LoggerFactory.getLogger(TransactionGraph.class);
 
-    protected static final String APP_NAME = "jgex";
-    protected static final String MIXED_INDEX_CONFIG_NAME = "jgex";
-
     protected String propFileName;
     protected Configuration conf;
     protected Graph graph;
@@ -38,37 +35,24 @@ public class TransactionGraph {
     protected boolean supportsTransactions;
     protected boolean supportsSchema;
 
-    protected boolean useMixedIndex;
-    protected String mixedIndexConfigName;
 
-    /**
-     * Constructs a graph app using the given properties.
-     * @param fileName location of the properties file
-     */
+    //Construct a graph app using the given properties from fileName.
     public TransactionGraph(final String fileName) {
         this.propFileName = fileName;
         this.supportsSchema = true;
         this.supportsTransactions = true;
-        this.useMixedIndex = true;
-        this.mixedIndexConfigName = MIXED_INDEX_CONFIG_NAME;
     }
 
-    /**
-     * Opens the graph instance. If the graph instance does not exist, a new
-     * graph instance is initialized.
-     */
+    //Opens the graph instance
     public GraphTraversalSource openGraph() throws ConfigurationException {
         LOGGER.info("opening graph");
         conf = new PropertiesConfiguration(propFileName);
         graph = GraphFactory.open(conf);
         g = graph.traversal();
-        useMixedIndex = useMixedIndex && conf.containsKey("index." + mixedIndexConfigName + ".backend");
         return g;
     }
 
-    /**
-     * Closes the graph instance.
-     */
+    //Close the graph
     public void closeGraph() throws Exception {
         LOGGER.info("closing graph");
         try {
@@ -84,25 +68,19 @@ public class TransactionGraph {
         }
     }
 
-    /**
-     * Returns the JanusGraph instance.
-     */
+    //Return the JanusGraph instance.
     protected JanusGraph getJanusGraph() {
         return (JanusGraph) graph;
     }
 
-    /**
-     * Drops the graph instance.
-     */
+    //Drops the graph
     public void dropGraph() throws Exception {
         if (graph != null) {
             JanusGraphFactory.drop(getJanusGraph());
         }
     }
 
-    /**
-     * Creates the graph schema.
-     */
+    //Creates the graph schema.
     public void createSchema() {
         final JanusGraphManagement management = getJanusGraph().openManagement();
         try {
@@ -116,16 +94,13 @@ public class TransactionGraph {
             createVertexLabels(management);
             createEdgeLabels(management);
             createCompositeIndexes(management);
-            createMixedIndexes(management);
             management.commit();
         } catch (Exception e) {
             management.rollback();
         }
     }
 
-    /**
-     * Creates the vertex labels.
-     */
+    //Creates the vertex labels.
     protected void createVertexLabels(final JanusGraphManagement management) {
         management.makeVertexLabel("Block").make();
         management.makeVertexLabel("Transaction").make();
@@ -133,9 +108,8 @@ public class TransactionGraph {
         management.makeVertexLabel("Address").make();
     }
 
-    /**
-     * Creates the edge labels.
-     */
+
+    //Create the edge labels.
     protected void createEdgeLabels(final JanusGraphManagement management) {
         management.makeEdgeLabel("chain").multiplicity(Multiplicity.ONE2ONE).make();
         management.makeEdgeLabel("has").multiplicity(Multiplicity.ONE2MANY).make();
@@ -144,9 +118,8 @@ public class TransactionGraph {
         management.makeEdgeLabel("locked").multiplicity(Multiplicity.MULTI).make();
     }
 
-    /**
-     * Creates the properties for vertices, edges, and meta-properties.
-     */
+
+    //Create the properties for vertices
     protected void createProperties(final JanusGraphManagement management) {
         management.makePropertyKey("name").dataType(String.class).make();
         management.makePropertyKey("BlockDate").dataType(Date.class).make();
@@ -186,35 +159,19 @@ public class TransactionGraph {
         management.makePropertyKey("OutputIsUsed").dataType(Boolean.class).make();
     }
 
-    /**
-     * Creates the composite indexes. A composite index is best used for
-     * exact match lookups.
-     */
+
+     //Creates the composite indexes
     protected void createCompositeIndexes(final JanusGraphManagement management) {
         management.buildIndex("nameIndex", Vertex.class).addKey(management.getPropertyKey("name")).buildCompositeIndex();
         management.buildIndex("blockIndex", Vertex.class).addKey(management.getPropertyKey("BlockHeight")).buildCompositeIndex();
     }
 
-    /**
-     * Creates the mixed indexes. A mixed index requires that an external
-     * indexing backend is configured on the graph instance. A mixed index
-     * is best for full text search, numerical range, and geospatial queries.
-     */
-    protected void createMixedIndexes(final JanusGraphManagement management) {
-        if (useMixedIndex) {
-            management.buildIndex("vAge", Vertex.class).addKey(management.getPropertyKey("age"))
-                    .buildMixedIndex(mixedIndexConfigName);
-            management.buildIndex("eReasonPlace", Edge.class).addKey(management.getPropertyKey("reason"))
-                    .addKey(management.getPropertyKey("place")).buildMixedIndex(mixedIndexConfigName);
-        }
-    }
-
     public GraphTraversalSource initializeTransactionGraph() throws Exception {
 
-        // open and initialize the graph
+        //Open and initialize the graph
         GraphTraversalSource g = openGraph();
 
-        // define the schema before loading data
+        //Define the schema before loading data
         if (supportsSchema) {
             createSchema();
         }
