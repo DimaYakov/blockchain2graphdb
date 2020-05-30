@@ -19,9 +19,6 @@ import sun.misc.Signal;
 import sun.misc.SignalHandler;
 
 public class BlockchainToGraph {
-    // Location of block files. This is where your blocks are located.
-    // Check the documentation of Bitcoin Core if you are using
-    // it, or use any other directory with blk*dat files.
     static String BLOCKSPATH;
     static String BITCOINDPATH;
     private static GraphTraversalSource g;
@@ -1132,7 +1129,7 @@ public class BlockchainToGraph {
             System.exit(0);
         } else {
             File file;
-            if (args == null) {
+            if (args == null || args.length == 0) {
                 String path = System.getProperty("user.dir");
                 file = new File( path + "/blockchain2graph.conf");
                 if (!file.exists()) {
