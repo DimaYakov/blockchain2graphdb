@@ -1253,7 +1253,7 @@ public class BlockchainToGraph {
         bp.parseBlockChain();
 
         //Start synchronizing blockchain
-        //bp.synchronizeDatabase();
+        bp.synchronizeDatabase();
 
         /*JanusGraph graph = tg.getJanusGraph();
         graph.io(IoCore.graphml()).writeGraph("output/export.xml");*/
