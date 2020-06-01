@@ -90,12 +90,15 @@ public class BlockchainToGraph {
     //Adds new block to Graph Database and deletes wrong chain
     void updateDatabase(String newHash, int newHeight) {
 
-        //Deleting wrong blocks
-        while (height >= newHeight) {
-            Vertex nextBlock = g.V().has("Block", "name", best).in("chain").next();
-            deleteBlock(best, height);
-            best = nextBlock.value("name");
-            height--;
+        if (height >= newHeight) {
+            LOGGER.info("Invalid chain was found. Deleting invalid blocks");
+            //Deleting wrong blocks
+            while (height >= newHeight) {
+                Vertex nextBlock = g.V().has("Block", "name", best).in("chain").next();
+                deleteBlock(best, height);
+                best = nextBlock.value("name");
+                height--;
+            }
         }
 
         //Add new block
@@ -111,11 +114,13 @@ public class BlockchainToGraph {
 
     //Starting Synchronize blocks
     void synchronizeDatabase() {
+        LOGGER.info("Start synchronizing");
         String s;
         Process p;
         try {
 
             //Start bitcoin full node
+            LOGGER.info("Starting full Bitcoin node");
             p = Runtime.getRuntime()
                     .exec(BITCOINDPATH +"/bitcoind -datadir=" + BLOCKSPATH);
 
@@ -150,6 +155,8 @@ public class BlockchainToGraph {
                     int newHeight = Integer.parseInt(s.substring(s.indexOf(patternHeight) + patternHeight.length(),
                             s.indexOf(patternVersion) - 1));
 
+                    LOGGER.info("New block was found with hash " + newHash);
+                    
                     //Call update method to add new block and delete wrong chain
                     updateDatabase(newHash, newHeight);
                 }
@@ -373,18 +380,15 @@ public class BlockchainToGraph {
 
             if (isExit) {
                 tg.closeGraph();
-                LOGGER.info("Last checked block " + (blockCounter - 1));
-                LOGGER.info("Shutting down");
+                LOGGER.info("Last checked block " + (blockCounter - 1) + ". Shutting down");
                 System.exit(0);
             }
             //Adding blocks to be sorted
             blockList.add(blk);
             sortedBlockCounter++;
-            LOGGER.info("Block "+ (blockCounter + sortedBlockCounter) + " added to be sorted");
             if (sortedBlockCounter == delay) {
 
                 //Sorting Blocks
-                LOGGER.info("Sorting blocks from " + blockCounter + " to " + (blockCounter + delay));
                 for (int i = 0; i <= halfDelay; i++) {
                     if (firstLoop) {
                         //Hash of the genesis Block
@@ -407,8 +411,6 @@ public class BlockchainToGraph {
                 }
                 prevHash = blockList.get(halfDelay-1).getHashAsString();
 
-                LOGGER.info("Blocks are sorted");
-
                 //Parsing sorted blocks
                 for (Block block : blockList) {
 
@@ -426,12 +428,6 @@ public class BlockchainToGraph {
                     if (blockCounter > 0) {
                         String currentHash = block.getPrevBlockHash().toString();
                         if (!currentHash.equals(previousHash)) {
-                            LOGGER.info("prev = " + previousHash + " cur = " + currentHash + " " + blockCounter);
-                            int i = 0;
-                            for (Block bk : blockList) {
-                                LOGGER.info(blockCounter - parsedBlockCounter + i + " " + bk.getHashAsString());
-                                i++;
-                            }
                             throw new Exception("Invalid chain");
                         } else {
                             previousHash = block.getHashAsString();
@@ -441,8 +437,7 @@ public class BlockchainToGraph {
                     //Parsing block
                     if (isExit) {
                         tg.closeGraph();
-                        LOGGER.info("Last checked block " + (blockCounter - 1));
-                        LOGGER.info("Shutting down");
+                        LOGGER.info("Last checked block " + (blockCounter - 1) + ". Shutting down");
                         System.exit(0);
                     }
                     LOGGER.info("Analysing block "+blockCounter);
@@ -468,7 +463,6 @@ public class BlockchainToGraph {
         }
 
         //Sorting last files
-        LOGGER.info("Sorting blocks from " + blockCounter + " to " + (blockCounter + delay));
         Collections.sort(blockList, blockComparator);
 
         for (int i = 0; i < blockList.size() - 1; i++) {
@@ -485,14 +479,12 @@ public class BlockchainToGraph {
             }
         }
 
-        LOGGER.info("Blocks are sorted");
         //Checking sorted blocks for right chain
         for (Block block : blockList) {
 
             if (blockCounter > 0) {
                 String currentHash = block.getPrevBlockHash().toString();
                 if (!currentHash.equals(previousHash)) {
-                    LOGGER.info("prev = " + previousHash + " cur = " + currentHash);
                     throw new Exception("Invalid chain");
                 } else {
                     previousHash = block.getHashAsString();
@@ -502,8 +494,7 @@ public class BlockchainToGraph {
             //Parsing block
             if (isExit) {
                 tg.closeGraph();
-                LOGGER.info("Last checked block " + (blockCounter - 1));
-                LOGGER.info("Shutting down");
+                LOGGER.info("Last checked block " + (blockCounter - 1) + ". Shutting down");
                 System.exit(0);
             }
             LOGGER.info("Analysing block "+blockCounter);
@@ -579,7 +570,7 @@ public class BlockchainToGraph {
 
             String o = output.value("name");
 
-            LOGGER.info("Updating output " + o);
+            LOGGER.info("Updating input " + o + "into output");
 
             g.V().has("name", o).property("OutputIsUsed", false).iterate();
             g.tx().commit();
@@ -1031,7 +1022,6 @@ public class BlockchainToGraph {
 
                 //Get transaction hash
                 String txHash = tx.getHashAsString();
-                LOGGER.info("Parsing transaction with Hash " + txHash);
 
                 //Get inputs and outputs of transaction
                 List<TransactionInput> txInputs = tx.getInputs();
@@ -1253,7 +1243,7 @@ public class BlockchainToGraph {
         bp.parseBlockChain();
 
         //Start synchronizing blockchain
-        bp.synchronizeDatabase();
+        //bp.synchronizeDatabase();
 
         /*JanusGraph graph = tg.getJanusGraph();
         graph.io(IoCore.graphml()).writeGraph("output/export.xml");*/
