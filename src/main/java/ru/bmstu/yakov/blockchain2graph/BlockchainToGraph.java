@@ -19,8 +19,8 @@ import sun.misc.Signal;
 import sun.misc.SignalHandler;
 
 public class BlockchainToGraph {
-    static String BLOCKSPATH;
-    static String BITCOINDPATH;
+    private static String BLOCKSPATH;
+    private static String BITCOINDPATH;
     private static GraphTraversalSource g;
     private static NetworkParameters np;
     private static TransactionGraph tg;
@@ -29,13 +29,13 @@ public class BlockchainToGraph {
     private int walletIDCounter;
     private String best;
     private int height;
-    int currentFileCount;
+    private int currentFileCount;
     private static final Logger LOGGER = LoggerFactory.getLogger(BlockchainToGraph.class);
-    int delay = 1126;
-    final int halfDelay = 100;
+    private final int delay = 1126;
+    private final int halfDelay = 100;
 
     //Get best chain off Graph Database
-    void getBestAndHeight() {
+    private void getBestAndHeight() {
         LOGGER.info("Checking if blocks downloaded");
         if (g.V().has("Block", "BlockHeight", 0).hasNext()) {
             LOGGER.info("Block 0 is downloaded. Loading best chain. It can take more than 1 minute");
@@ -77,7 +77,7 @@ public class BlockchainToGraph {
     };
 
     //Get last blk***.dat file
-    void getCurrentFile() {
+    private void getCurrentFile() {
         for (int i = 0; true; i++) {
             File file = new File(BLOCKSPATH + "/blocks/" + String.format(Locale.US, "blk%05d.dat", i));
             if (!file.exists())  {
@@ -88,7 +88,7 @@ public class BlockchainToGraph {
     }
 
     //Adds new block to Graph Database and deletes wrong chain
-    void updateDatabase(String newHash, int newHeight) {
+    private void updateDatabase(String newHash, int newHeight) {
 
         if (height >= newHeight) {
             LOGGER.info("Invalid chain was found. Deleting invalid blocks");
@@ -113,7 +113,7 @@ public class BlockchainToGraph {
     }
 
     //Starting Synchronize blocks
-    void synchronizeDatabase() {
+    private void synchronizeDatabase() {
         LOGGER.info("Start synchronizing");
         String s;
         Process p;
@@ -156,7 +156,7 @@ public class BlockchainToGraph {
                             s.indexOf(patternVersion) - 1));
 
                     LOGGER.info("New block was found with hash " + newHash);
-                    
+
                     //Call update method to add new block and delete wrong chain
                     updateDatabase(newHash, newHeight);
                 }
@@ -520,7 +520,7 @@ public class BlockchainToGraph {
     }
 
     //Deleting invalid blocks
-    void deleteInvalidBlocks(String lastBlockHash) {
+    private void deleteInvalidBlocks(String lastBlockHash) {
         while (!lastBlockHash.equals(best)) {
             Vertex nextBlock = g.V().has("Block", "name", best).in("chain").next();
             deleteBlock(best, height);
@@ -530,7 +530,7 @@ public class BlockchainToGraph {
     }
 
     //Calculating blocks signs, then calling addBlockToGraph method
-    void addBlock(Block block, int blockCounter) {
+    private void addBlock(Block block, int blockCounter) {
 
         String curBlockHash = block.getHashAsString();
         Date blockDate = block.getTime();
@@ -547,7 +547,7 @@ public class BlockchainToGraph {
     }
 
     //Recalculating blocks signs, then updating block in Graph Database
-    void updateBlock(String blockHash, int blockCounter, long blockBalance, long blockFee) {
+    private void updateBlock(String blockHash, int blockCounter, long blockBalance, long blockFee) {
         try {
             LOGGER.info("Updating block " + blockCounter);
 
@@ -565,7 +565,7 @@ public class BlockchainToGraph {
 
     //Recalculating output signs when transaction is deleted,
     //then calling updating Output and it's Address in Graph Database
-    void updateOutput(Vertex output) {
+    private void updateOutput(Vertex output) {
         try {
 
             String o = output.value("name");
@@ -629,7 +629,7 @@ public class BlockchainToGraph {
     }
 
     //Deleting output from Graph Database
-    void deleteOutput(String transactionHash, Vertex output, int blockCounter) {
+    private void deleteOutput(String transactionHash, Vertex output, int blockCounter) {
         try {
             String o = output.value("name");
 
@@ -710,7 +710,7 @@ public class BlockchainToGraph {
     }
 
     //Deleting Transaction from Graph Database
-    void deleteTransaction(Vertex transaction, int blockCounter) {
+    private void deleteTransaction(Vertex transaction, int blockCounter) {
         try {
 
             String tx = transaction.value("name");
@@ -756,7 +756,7 @@ public class BlockchainToGraph {
     }
 
     //Deleting Block from Graph Database
-    void deleteBlock(String blockHash, int blockCounter) {
+    private void deleteBlock(String blockHash, int blockCounter) {
         try {
             LOGGER.info("Deleting block " + blockCounter);
 
@@ -777,7 +777,7 @@ public class BlockchainToGraph {
     }
 
     //Calculating transaction signs, then calling addTransactionToGraph method
-    void addTransaction(String blockHash, int blockHeight, int transactionInputCount, int transactionOutputCount,
+    private void addTransaction(String blockHash, int blockHeight, int transactionInputCount, int transactionOutputCount,
                         Transaction transaction, Date transactionDate) {
 
         String transactionHash = transaction.getHashAsString();
@@ -817,7 +817,7 @@ public class BlockchainToGraph {
     }
 
     //Recalculating transaction signs, then updating transaction in Graph Database
-    void updateTransaction(String transactionHash, int transactionNewAddressCount) {
+    private void updateTransaction(String transactionHash, int transactionNewAddressCount) {
         try {
             LOGGER.info("Updating transaction " + transactionHash);
 
@@ -834,7 +834,7 @@ public class BlockchainToGraph {
     }
 
     //Calculating address signs, then calling addAddressToGraph method
-    void addAddress(String transactionHash, String outputHash, String addressAddress, long outputBalance, Date date) {
+    private void addAddress(String transactionHash, String outputHash, String addressAddress, long outputBalance, Date date) {
 
         long addressBalance;
         Date addressFirstAppearDate;
@@ -903,7 +903,7 @@ public class BlockchainToGraph {
     }
 
     //Recalculating address signs, then updating address in GraphDatabase
-    void updateAddress(String outputHash, Date date) {
+    private void updateAddress(String outputHash, Date date) {
 
         final Vertex address = g.V().has("name", outputHash).out("locked").next();
         final Vertex output = g.V().has("name", outputHash).next();
@@ -947,7 +947,7 @@ public class BlockchainToGraph {
     }
 
     //Recalculating complex address signs, then updating Address in Graph Database
-    void calculateAndUpdateAddress(String addressAddress) {
+    private void calculateAndUpdateAddress(String addressAddress) {
         if (g.V().has("name", addressAddress).hasNext()) {
             final List<Vertex> inTransactions = g.V().has("name", addressAddress).in("locked").in("output").toList();
             final List<Vertex> outTransactions = g.V().has("name", addressAddress).in("locked").out("input").toList();
@@ -983,7 +983,7 @@ public class BlockchainToGraph {
     }
 
     //Calling addInputToGraph method and updating connected address
-    void addInput(String transactionHash, String connectedOutputTransactionHash, int connectedOutputHeight, Date date) {
+    private void addInput(String transactionHash, String connectedOutputTransactionHash, int connectedOutputHeight, Date date) {
 
         String outputHash = connectedOutputTransactionHash + ":" + connectedOutputHeight;
 
@@ -994,7 +994,7 @@ public class BlockchainToGraph {
     }
 
     //Calling addOutputToGraph method and updating connected address
-    void addOutput(int blockCounter, String transactionHash, String outputHash, int outputHeight,
+    private void addOutput(int blockCounter, String transactionHash, String outputHash, int outputHeight,
                    long outputValue, String address, Date date) {
         boolean outputIsUsed = false;
 
@@ -1004,7 +1004,7 @@ public class BlockchainToGraph {
     }
 
     //Parsing block then adding it in Graph Database
-    void parseBlock(Block block, int blockCounter) {
+    private void parseBlock(Block block, int blockCounter) {
 
         //Get some data from block
         Date date = block.getTime();

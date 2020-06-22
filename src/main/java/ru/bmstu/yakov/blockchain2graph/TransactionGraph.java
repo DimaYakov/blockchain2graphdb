@@ -1,25 +1,18 @@
 package ru.bmstu.yakov.blockchain2graph;
 
 import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.tinkerpop.gremlin.process.traversal.P;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource;
-import org.apache.tinkerpop.gremlin.structure.Edge;
 import org.apache.tinkerpop.gremlin.structure.Graph;
 import org.apache.tinkerpop.gremlin.structure.Vertex;
-import org.apache.tinkerpop.gremlin.structure.io.IoCore;
 import org.apache.tinkerpop.gremlin.structure.util.GraphFactory;
 import org.janusgraph.core.JanusGraph;
 import org.janusgraph.core.JanusGraphFactory;
 import org.janusgraph.core.Multiplicity;
 import org.janusgraph.core.RelationType;
-import org.janusgraph.core.attribute.Geoshape;
 import org.janusgraph.core.schema.JanusGraphManagement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,20 +25,16 @@ public class TransactionGraph {
     protected Configuration conf;
     protected Graph graph;
     protected GraphTraversalSource g;
-    protected boolean supportsTransactions;
-    protected boolean supportsSchema;
 
 
     //Construct a graph app using the given properties from fileName.
     public TransactionGraph(final String fileName) {
         this.propFileName = fileName;
-        this.supportsSchema = true;
-        this.supportsTransactions = true;
     }
 
     //Opens the graph instance
     public GraphTraversalSource openGraph() throws ConfigurationException {
-        LOGGER.info("opening graph");
+        LOGGER.info("Opening graph");
         conf = new PropertiesConfiguration(propFileName);
         graph = GraphFactory.open(conf);
         g = graph.traversal();
@@ -54,7 +43,8 @@ public class TransactionGraph {
 
     //Close the graph
     public void closeGraph() throws Exception {
-        LOGGER.info("closing graph");
+        LOGGER.info("Closing graph");
+
         try {
             if (g != null) {
                 g.close();
@@ -73,7 +63,7 @@ public class TransactionGraph {
         return (JanusGraph) graph;
     }
 
-    //Drops the graph
+    //Drop the graph
     public void dropGraph() throws Exception {
         if (graph != null) {
             JanusGraphFactory.drop(getJanusGraph());
@@ -89,12 +79,15 @@ public class TransactionGraph {
                 management.rollback();
                 return;
             }
-            LOGGER.info("creating schema");
+            LOGGER.info("Creating schema");
+
             createProperties(management);
             createVertexLabels(management);
             createEdgeLabels(management);
             createCompositeIndexes(management);
+
             management.commit();
+
         } catch (Exception e) {
             management.rollback();
         }
@@ -168,13 +161,11 @@ public class TransactionGraph {
 
     public GraphTraversalSource initializeTransactionGraph() throws Exception {
 
-        //Open and initialize the graph
+        //Open the graph
         GraphTraversalSource g = openGraph();
 
-        //Define the schema before loading data
-        if (supportsSchema) {
-            createSchema();
-        }
+        //Define the schema
+        createSchema();
 
         return g;
     }
